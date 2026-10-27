@@ -1048,7 +1048,8 @@ function settle(live){
     const slice=all.reduce((t,p)=>t+Math.max(0,Math.min(p.c,L)-prev),0);
     let el=live.filter(p=>p.c>=L);if(!el.length)el=live;
     const top=Math.max(...el.map(p=>p.e.s)),w=el.filter(p=>p.e.s===top);
-    w.forEach(p=>{won[p.seat]+=slice/w.length;if(el.length>1)cw[p.seat]=1});prev=L;
+    const part=Math.floor(slice/w.length),odd=slice-part*w.length;
+    w.forEach((p,i)=>{won[p.seat]+=part+(i===0?odd:0);if(el.length>1)cw[p.seat]=1});prev=L;
   }
   return {won,cw};
 }
