@@ -124,7 +124,9 @@ details ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;g
 
   <div class="bar" id="bar">
     <select id="topic" aria-label="Тема тренировки"></select>
-    <label><input type="checkbox" id="cfg-raise"> Рейзы соперников до флопа (доп.)</label>
+    <label id="l-raise"><input type="checkbox" id="cfg-raise"> Рейзы соперников до флопа (доп.)</label>
+    <label id="l-fair"><input type="checkbox" id="cfg-fair"> Честная раздача: свои карты без подбора</label>
+    <select id="minisel" aria-label="Тип мини-тренажёра"><option value="all">Все мини-тренажёры</option><option value="rank">Какая рука старше</option><option value="win">Кто выиграет</option><option value="need">Нужный шанс</option></select>
   </div>
 
   <section class="table" aria-live="polite">
@@ -195,8 +197,11 @@ details ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;g
   </details>
   <details>
     <summary>Шпаргалка: комбинации по старшинству</summary>
+    <div class="tbl"><table id="combos">
+      <thead><tr><th>#</th><th>Комбинация</th><th>Пример</th><th>Что это</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
     <ul>
-      <li>От младшей к старшей: старшая карта → пара → две пары → тройка (сет) → стрит → флеш → фулл-хаус → каре → стрит-флеш.</li>
       <li>Одинаковые комбинации сравниваем по старшей карте комбинации, потом по кикерам (оставшимся картам).</li>
       <li>Туз в стрите может быть и младшей картой: A-2-3-4-5 — самый младший стрит.</li>
     </ul>
@@ -282,6 +287,19 @@ function handLabel(e){const t=e.t;switch(e.cat){
   case 6:return "фулл-хаус: "+GP[t[0]]+" и "+GP[t[1]];
   case 7:return "каре "+GP[t[0]];
   default:return "стрит-флеш"}}
+
+/* Таблица комбинаций для шпаргалки */
+document.querySelector("#combos tbody").innerHTML=[
+  ["Стрит-флеш","Ts Js Qs Ks As".split(" "),"пять карт подряд одной масти (A-K-Q-J-10 одной масти — роял-флеш)"],
+  ["Каре","9s 9h 9d 9c 4s".split(" "),"четыре карты одного достоинства"],
+  ["Фулл-хаус","Ks Kh Kd 5s 5c".split(" "),"тройка + пара"],
+  ["Флеш","As 9s 7s 4s 2s".split(" "),"пять карт одной масти, не подряд"],
+  ["Стрит","5s 6h 7d 8c 9s".split(" "),"пять карт подряд разных мастей; туз бывает и младшим (A-2-3-4-5)"],
+  ["Тройка (сет)","Qs Qh Qd 8c 3s".split(" "),"три карты одного достоинства"],
+  ["Две пары","Js Jh 4d 4c As".split(" "),"две разные пары"],
+  ["Пара","8s 8h Ad 6c 2s".split(" "),"две карты одного достоинства"],
+  ["Старшая карта","As Jh 9d 6c 3s".split(" "),"ничего из перечисленного, решает старшая карта"]
+].map((r,i)=>"<tr><td>"+(i+1)+"</td><td><b>"+r[0]+"</b></td><td>"+r[1].map(mini).join("")+"</td><td style=\"white-space:normal;min-width:150px\">"+r[2]+"</td></tr>").join("");
 
 /* ===== Стол на 5 игроков ===== */
 const PRE_ORDER=["UTG","CO","BTN","SB","BB"], POST_ORDER=["SB","BB","UTG","CO","BTN"];
@@ -464,12 +482,12 @@ function makeQ(kind,h,x){
 }
 
 /* ===== Состояние, статистика, ошибки ===== */
-let st,mode="full",score={C:0,O:0,W:0},chips=0,cfg={raise:false},topicPick="all",stats={},mist=[];
+let miniPick="all",st,mode="full",score={C:0,O:0,W:0},chips=0,cfg={raise:false,fair:false},topicPick="all",stats={},mist=[];
 const ld=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}};
 const sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 score=ld("pk-score",score);chips=ld("pk-chips",0);cfg=Object.assign(cfg,ld("pk-cfg",{}));
 topicPick=ld("pk-topic","all");if(topicPick!=="all"&&!TOPICS[topicPick])topicPick="all";
-mist=ld("pk-mist",[]);if(!Array.isArray(mist))mist=[];
+miniPick=ld("pk-mini","all");mist=ld("pk-mist",[]);if(!Array.isArray(mist))mist=[];
 try{mode=localStorage.getItem("pk-mode")||"full"}catch(e){}
 if(!["full","drill","mini","mist"].includes(mode))mode="full";
 const stored=ld("pk-stats",{});
@@ -524,7 +542,7 @@ function startFull(){
   const heroSeat=pick(PRE_ORDER), late=!!LATE[heroSeat];
   let deck,hole; const wantPlay=Math.random()<.6;
   for(let i=0;i<300;i++){deck=deckNew();hole=[deck.pop(),deck.pop()];
-    const t=tier(hole); if(!wantPlay||t==="p"||(t==="l"&&late))break}
+    const t=tier(hole); if(cfg.fair||!wantPlay||t==="p"||(t==="l"&&late))break}
   st={mode:"full",deck,hole,board:[],street:"pre",phase:"act",players:seatPlayers(heroSeat),seen:[],carry:"",log:[],limpers:0,preOnly:topicPick==="pre"};
   dealAll();
   P("SB").c=5;P("SB").last="блайнд 5";P("BB").c=10;P("BB").last="блайнд 10";
@@ -750,7 +768,7 @@ function endHand(text,won){
 
 /* ===== Мини-тренажёры ===== */
 function startMini(){
-  const k=pick(["rank","win","need"]);let q;
+  const k=miniPick==="all"?pick(["rank","win","need"]):miniPick;let q;
   if(k==="rank"){
     const strong=Math.random()<.5;let a,b,ea,eb;
     for(let i=0;i<500;i++){const d=deckNew();a=d.splice(0,5);b=d.splice(0,5);ea=eval5(a);eb=eval5(b);
@@ -930,12 +948,18 @@ function newHand(){
 }
 function setMode(m){mode=m;try{localStorage.setItem("pk-mode",m)}catch(e){}
   for(const k of ["full","drill","mini","mist"])document.getElementById("mode-"+k).setAttribute("aria-pressed",String(m===k));
-  document.getElementById("bar").hidden=m!=="full";newHand()}
+  document.getElementById("bar").hidden=m!=="full"&&m!=="mini";
+  for(const id of ["topic","l-raise","l-fair"])document.getElementById(id).hidden=m!=="full";
+  document.getElementById("minisel").hidden=m!=="mini";newHand()}
 for(const k of ["full","drill","mini","mist"])document.getElementById("mode-"+k).onclick=()=>setMode(k);
 topicSel.value=topicPick;
 topicSel.onchange=()=>{topicPick=topicSel.value;sv("pk-topic",topicPick);newHand()};
 const cr=document.getElementById("cfg-raise");cr.checked=!!cfg.raise;
 cr.onchange=()=>{cfg.raise=cr.checked;sv("pk-cfg",cfg);newHand()};
+const cf=document.getElementById("cfg-fair");cf.checked=!!cfg.fair;
+cf.onchange=()=>{cfg.fair=cf.checked;sv("pk-cfg",cfg);newHand()};
+const ms=document.getElementById("minisel");ms.value=miniPick;
+ms.onchange=()=>{miniPick=ms.value;sv("pk-mini",miniPick);newHand()};
 let resetArmed=0;
 document.getElementById("reset").onclick=e=>{
   if(!resetArmed){resetArmed=setTimeout(()=>{resetArmed=0;e.target.textContent="Сбросить счёт, статистику и ошибки"},4000);e.target.textContent="Точно сбросить? Нажми ещё раз";return}
