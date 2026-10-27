@@ -38,7 +38,7 @@ h1{font-size:21px;font-weight:800;margin:0}
 .bar select{font:600 13px var(--sans);padding:7px 8px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);max-width:100%}
 .bar label{display:flex;gap:6px;align-items:center;cursor:pointer}
 .table{background:var(--felt);color:var(--felt-fg);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:12px}
-.seats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+.seats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .seats:empty{display:none}
 .seat{background:rgb(0 0 0/.2);border-radius:8px;padding:6px 3px 5px;text-align:center;min-width:0;position:relative;display:flex;flex-direction:column;gap:1px}
 .seat .sn{font-weight:800;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -123,7 +123,7 @@ details ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;g
 <div class="wrap">
   <header>
     <h1>Покерный тренажёр</h1>
-    <div class="score" aria-label="Счёт"><span class="g" id="sc-g">✓ 0</span><span class="o" id="sc-o">~ 0</span><span class="b" id="sc-b">✗ 0</span><span id="sc-stack" title="Твой стек переходит из раздачи в раздачу">стек 100 ББ</span><span id="sc-chips" title="Фишки за раздачи полного режима">фишки 0</span></div>
+    <div class="score" aria-label="Счёт"><span class="g" id="sc-g">✓ 0</span><span class="o" id="sc-o">~ 0</span><span class="b" id="sc-b">✗ 0</span><span id="sc-stack" title="Твой стек переходит из раздачи в раздачу">стек 60 ББ</span><span id="sc-chips" title="Фишки за раздачи полного режима">фишки 0</span></div>
   </header>
 
   <div class="seg" role="group" aria-label="Режим">
@@ -246,11 +246,12 @@ const LESSONS=[
   {n:3,t:["Шансы банка: сравниваем шанс собрать руку с ценой колла."]},
   {n:4,t:["Счёт аутов и шансов: ауты × 4 и × 2, точные проценты, цена колла, когда в банке несколько игроков."]},
   {n:5,t:["Рейзы и руки на дро: с поздних мест (CO и BTN) добавляем A9s–A2s и сьютед-коннекторы T9s, 98s, 87s, 76s, 65s, 54s. Те же руки разных мастей — пас.",
-          "Размер рейза: 3ББ + 1ББ за каждого уравнявшего (ББ = 10). Меньше — допустимо, но размер занижен.",
+          "Размер рейза: 3ББ + 1ББ за каждого уравнявшего (ББ = 5). Меньше — допустимо, но размер занижен.",
           "Против рейза до флопа: AA, KK, QQ, AK — рейз сверху; JJ, 10-10, AQ — колл на небольшой рейз; остальное пас.",
           "Колл сьютед-коннектора или сьютед-туза при дешёвом входе (есть уравнявшие, поздняя позиция) — допустимо."]},
   {n:6,t:["Ривер: сильная рука — ставка 1/2–2/3 банка; средняя — чек, ставку до 1/3 банка можно уравнять, от 1/2 и выше пас; ничего или несобранное дро — чек, на ставку пас, блеф — ошибка. Ставка соперника в банк и больше — почти всегда сильная рука, средние руки пас.",
           "Вскрытие: лучшие 5 карт из 7, кикеры, сплит."]},
+  {label:"Правила стола (по твоей просьбе)",t:["6 игроков, стек 300 (60 ББ), блайнды по 5 (ББ = 5).","Позиции: ранняя, средняя, CO, BTN, малый и большой блайнд. Поздние позиции — CO и BTN."]},
   {label:"Расширение диапазона (по твоей просьбе)",t:["Всегда играем: пары 66+ (раньше 77+), AT и KJ (раньше только с поздней позиции).","С поздней позиции добавлены KT, QT. Остальные расширения — в уроке 5."]}
 ];
 document.getElementById("lessons").innerHTML=LESSONS.map(l=>"<li><b>"+(l.label||"Урок "+l.n)+".</b> "+l.t.join("<br>")+"</li>").join("");
@@ -271,10 +272,10 @@ const topicSel=document.getElementById("topic");
 topicSel.innerHTML='<option value="all">Все темы (полная раздача)</option>'+Object.keys(TOPICS).filter(k=>TOPICS[k].pick).map(k=>'<option value="'+k+'">'+TOPICS[k].pick+"</option>").join("");
 
 /* ===== Карты ===== */
-const BB=10,BLITZ_SEC=10,START_STACK=1000,REBUY_BELOW=30;
+const BB=5,BLITZ_SEC=10,START_STACK=300,REBUY_BELOW=3*BB; // 6 игроков, стек 300, блайнды по 5 (ББ = 5)
 /* Версия правил. Увеличивай на 1, когда меняется диапазон рук или правила оценки: старые записи журнала нельзя сравнивать с новыми.
-   1: первая версия. 2: диапазон расширен, уроки 5 и 6. 3: защита ББ против небольшого рейза — «допустимо». */
-const RULES_VERSION=3;
+   1: первая версия. 2: диапазон расширен, уроки 5 и 6. 3: защита ББ против небольшого рейза — «допустимо». 4: стол на 6 игроков (добавлена средняя позиция), стек 300, блайнды 5/5, ББ = 5. */
+const RULES_VERSION=4;
 const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
 /* Флаги борда для журнала: парный, мокрый, возможен стрит, возможен флеш */
 function boardFlags(board){
@@ -376,9 +377,9 @@ function equity(hero,opp,board){
 }
 
 /* ===== Стол на 5 игроков ===== */
-const PRE_ORDER=["UTG","CO","BTN","SB","BB"], POST_ORDER=["SB","BB","UTG","CO","BTN"];
-const SEATN={UTG:"Ранняя позиция",CO:"Перед баттоном",BTN:"Баттон",SB:"Малый блайнд",BB:"Большой блайнд"};
-const SEATS={UTG:"ранняя",CO:"перед батт.",BTN:"баттон",SB:"МБ",BB:"ББ"};
+const PRE_ORDER=["UTG","MP","CO","BTN","SB","BB"], POST_ORDER=["SB","BB","UTG","MP","CO","BTN"];
+const SEATN={UTG:"Ранняя позиция",MP:"Средняя позиция",CO:"Перед баттоном",BTN:"Баттон",SB:"Малый блайнд",BB:"Большой блайнд"};
+const SEATS={UTG:"ранняя",MP:"средняя",CO:"перед батт.",BTN:"баттон",SB:"МБ",BB:"ББ"};
 const LATE={CO:true,BTN:true};
 const FRIENDS=["Дима","Саша","Миша","Оля","Костя","Аня","Вова"];
 /* Стили соперников. Массивы — вероятности по силе руки: [ничего, дро, средняя, сильная] */
@@ -585,39 +586,35 @@ function raiseClass(h){
   if((a===b&&(hi===11||hi===10))||(a!==b&&k==="AQ"))return "mid";
   return "none";
 }
-function evPre(act,size){
+function evPre(act,size){return evPre0(act,size)*BB/10} // модель задана для ББ = 10
+function evPre0(act,size){
   const h=st.hole,t=tier(h),play=t==="p"||(t==="l"&&!!LATE[hero().seat]);
   if(st.raise){
-    const c=raiseClass(h),small=st.raise.to<=40,bbDef=hero().seat==="BB"&&small&&tier(h)!=="f";
+    const c=raiseClass(h),small=st.raise.to<=4*BB,bbDef=hero().seat==="BB"&&small&&tier(h)!=="f";
     return ({prem:{raise:14,call:5,fold:0},mid:{raise:-4,call:small?4:-3,fold:0},none:{raise:-14,call:bbDef?2:-8,fold:0}})[c][act];
   }
-  const R=30+10*st.limpers;
+  const R=R3(st.limpers);
   if(act==="fold"||act==="check")return 0;
   if(act==="raise")return play?8-(size&&size<R?3:0):-7;
   return play?2:-5;
 }
 function judgePre(act,size){
   if(st.raise) return judgeVsRaise(act);
-  const H=hero(),seat=H.seat,h=st.hole,t=tier(h),late=!!LATE[seat],name=handName(h),L=st.limpers,R=30+10*L;
+  const H=hero(),seat=H.seat,h=st.hole,t=tier(h),late=!!LATE[seat],name=handName(h),L=st.limpers,R=R3(L);
   const pair=h[0][0]===h[1][0], play=t==="p"||(t==="l"&&late), sz=size||R;
   const a=val(h[0]),b=val(h[1]),hi=Math.max(a,b),lo=Math.min(a,b),suited=su(h[0])===su(h[1]);
   const ss=suited&&!pair&&(hi===14||hi-lo===1);
   const where=t==="p"?"Эту руку играем с любой позиции.":t==="l"?(late?"Эту руку играем только с поздней позиции, а ты как раз на ней.":"Эту руку играем только с поздней позиции (CO и BTN), а ты не на ней."):"Эта рука не входит в список стартовых рук.";
   const pre="У тебя "+name+". "+where+" ";
   const ext=extNote(h),out=r=>{if(r.g!=="C"&&ext)r.why+=" "+ext;return r};
-  const szNote=" Размер рейза занижен: правило — 3ББ + 1ББ за каждого уравнявшего, то есть до "+R+" (ББ = 10), а ты поставил "+sz+".";
+  const szNote=" Размер рейза занижен: правило — 3ББ + 1ББ за каждого уравнявшего, то есть до "+R+" (ББ = "+BB+"), а ты поставил "+sz+".";
   const rz=ok=>sz<R?out({g:"O",size:true,why:pre+"Рейз верный."+szNote}):out({g:"C",why:pre+ok});
-  if(seat==="BB"){
-    if(act==="check") return out(play?{g:"O",why:pre+"Бесплатный флоп неплох, но сильной рукой лучше поднять и взять инициативу."}:{g:"C",why:pre+"На большом блайнде можно бесплатно посмотреть флоп. Чек — правильно."});
+  if(seat==="BB"||seat==="SB"){
+    if(act==="check") return out(play?{g:"O",why:pre+"Бесплатный флоп неплох, но сильной рукой лучше поднять и взять инициативу."}:{g:"C",why:pre+"На блайнде можно бесплатно посмотреть флоп: блайнды равны, доплачивать нечего. Чек — правильно."});
     return play?rz("Рейз — правильно: соперники зашли дёшево, а у тебя сильная рука.")
       :out({g:"W",why:pre+"Рейз слабой рукой раздувает банк, в котором ты будешь ходить одним из первых. Просто чек."});
   }
-  if(seat==="SB"){
-    if(act==="raise") return play?rz("Рейз — правильно."):out({g:"W",why:pre+"Рейз слабой рукой с худшей позиции — лишние фишки. Пас."});
-    if(act==="call") return out(play?{g:"O",why:pre+"Доплатить можно, но сильной рукой лучше рейз."}:{g:"O",why:pre+"Доплатить 5 дёшево, но после флопа ты ходишь первым. Обычно проще пас."});
-    return out(play?{g:"W",why:pre+"Сбрасывать её не нужно — рейз."}:{g:"C",why:pre+"Пас — правильно."});
-  }
-  if(act==="raise") return play?rz("Рейз — правильно."+(L?" Против коллеров рейзим крупнее: 30 + по 10 за каждого.":""))
+  if(act==="raise") return play?rz("Рейз — правильно."+(L?" Против коллеров рейзим крупнее: 3ББ + по 1ББ за каждого уравнявшего.":""))
                                :out({g:"W",why:pre+"Лишние руки — главный источник проигрышей против друзей. Пас."});
   if(act==="call"){
     if(pair&&t==="l"&&L>=2) return out({g:late?"C":"O",why:pre+"Мелкая пара и в банке уже "+L+" игрока: можно дёшево уравнять в расчёте на сет. Шанс попасть в сет на флопе около 12%. Попадёшь — заберёшь большой банк, нет — сбросишь."+(late?"":" С ранней позиции это рискованнее: за тобой ещё могут поднять.")});
@@ -628,7 +625,7 @@ function judgePre(act,size){
 }
 /* Урок 5: перед тобой поднял соперник */
 function judgeVsRaise(act){
-  const h=st.hole,c=raiseClass(h),to=st.raise.to,small=to<=40;
+  const h=st.hole,c=raiseClass(h),to=st.raise.to,small=to<=4*BB;
   const pre="Перед тобой поднял соперник до "+to+" ("+(to/BB)+"ББ). У тебя "+handName(h)+". ";
   if(c==="prem") return act==="raise"?{g:"C",why:pre+"Это верх диапазона (AA, KK, QQ, AK): повышаем и растим банк."}
     :act==="call"?{g:"O",why:pre+"Колл не ошибка, но с такой рукой лучше повысить."}
@@ -716,10 +713,10 @@ function makeQ(kind,h,x){
 }
 
 /* ===== Состояние, статистика, ошибки, журнал ===== */
-let heroStack=1000,miniPick="all",showPick="all",st,mode="full",score={C:0,O:0,W:0},chips=0,cfg={raise:true,fair:false,blitz:false,draws:true},topicPick="all",stats={},mist=[];
+let heroStack=300,miniPick="all",showPick="all",st,mode="full",score={C:0,O:0,W:0},chips=0,cfg={raise:true,fair:false,blitz:false,draws:true},topicPick="all",stats={},mist=[];
 const ld=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}};
 const sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
-score=ld("pk-score",score);chips=ld("pk-chips",0);heroStack=ld("pk-stack",START_STACK);if(!(heroStack>0))heroStack=START_STACK;cfg=Object.assign(cfg,ld("pk-cfg2",{}));
+score=ld("pk-score",score);chips=ld("pk-chips",0);heroStack=ld("pk-stack6",START_STACK);if(!(heroStack>0))heroStack=START_STACK;cfg=Object.assign(cfg,ld("pk-cfg2",{}));
 topicPick=ld("pk-topic","all");if(topicPick!=="all"&&!(TOPICS[topicPick]&&TOPICS[topicPick].pick))topicPick="all";
 miniPick=ld("pk-mini","all");if(!["all","combo","rank","need"].includes(miniPick))miniPick="all";
 showPick=ld("pk-show","all");if(!["all","kicker","full","wheel","board","flush","random"].includes(showPick))showPick="all";
@@ -728,9 +725,11 @@ try{mode=localStorage.getItem("pk-mode")||"full"}catch(e){}
 if(!["full","drill","show","mini","mist"].includes(mode))mode="full";
 const stored=ld("pk-stats",{});
 /* Постоянный стол: те же четыре друга со своими стилями, баттон по кругу (у героя позиции идут BTN → CO → UTG → ББ → МБ → BTN) */
-let tbl=ld("pk-table",null);
-if(!tbl||!Array.isArray(tbl.names)||tbl.names.length!==4||!Array.isArray(tbl.styles)||!(tbl.hIdx>=0)){
-  tbl={names:shuffle(FRIENDS).slice(0,4),styles:[0,1,2,3].map(()=>pick(STYLE_POOL)),hIdx:Math.floor(Math.random()*5)};sv("pk-table",tbl)}
+const FMT=6; // формат стола: 6 игроков
+if(ld("pk-fmt",0)!==FMT){mist=[];heroStack=START_STACK;sv("pk-fmt",FMT)}
+let tbl=ld("pk-table6",null);
+if(!tbl||!Array.isArray(tbl.names)||tbl.names.length!==5||!Array.isArray(tbl.styles)||!Array.isArray(tbl.stacks)||!(tbl.hIdx>=0)){
+  tbl={names:shuffle(FRIENDS).slice(0,5),styles:[0,1,2,3,4].map(()=>pick(STYLE_POOL)),stacks:[0,1,2,3,4].map(()=>START_STACK),hIdx:Math.floor(Math.random()*6)};sv("pk-table6",tbl)}
 for(const k in TOPICS)stats[k]=Object.assign({C:0,O:0,W:0},stored[k]);
 const GR={C:"верно",O:"допустимо",W:"ошибка"};
 
@@ -744,7 +743,7 @@ function renderStats(){
   document.getElementById("weak").textContent=worst?"Слабее всего сейчас: «"+TOPICS[worst.k].name+"» ("+Math.round(worst.pc*100)+"%)."+(TOPICS[worst.k].pick?" Выбери её в списке тем и потренируйся отдельно.":""):"Нужно хотя бы 5 ответов по теме, чтобы показать слабое место. Процент: верно = 1, допустимо = ½.";
 }
 function updateMistBtn(){document.getElementById("mode-mist").textContent="Мои ошибки"+(mist.length?" ("+mist.length+")":"")}
-function saveScore(){sv("pk-score",score);sv("pk-chips",chips);sv("pk-stack",heroStack);
+function saveScore(){sv("pk-score",score);sv("pk-chips",chips);sv("pk-stack6",heroStack);
   document.getElementById("sc-stack").textContent="стек "+bbs(heroStack)+" ББ";sv("pk-stats",stats);sv("pk-mist",mist);
   document.getElementById("sc-g").textContent="✓ "+score.C;
   document.getElementById("sc-o").textContent="~ "+score.O;
@@ -781,18 +780,21 @@ function put(p,x){x=Math.max(0,Math.min(x,rem(p)));p.s+=x;p.c+=x;if(rem(p)<=0)p.
 const bbs=x=>Math.round(x/BB*10)/10;
 
 function seatPlayers(heroSeat){
-  const hi=PRE_ORDER.indexOf(heroSeat);
-  return PRE_ORDER.map((seat,j)=>{const i=(j-hi+5)%5;
-    return {seat,hero:i===0,name:i===0?"Ты":tbl.names[i-1],active:true,c:0,s:0,last:"",allin:false,stack0:i===0?heroStack:pick([300,500,800,1000]),style:i===0?null:tbl.styles[i-1]}});
+  const hi=PRE_ORDER.indexOf(heroSeat),n=PRE_ORDER.length;
+  return PRE_ORDER.map((seat,j)=>{const i=(j-hi+n)%n;
+    return {seat,hero:i===0,fi:i-1,name:i===0?"Ты":tbl.names[i-1],active:true,c:0,s:0,last:"",allin:false,stack0:i===0?heroStack:tbl.stacks[i-1],style:i===0?null:tbl.styles[i-1]}});
 }
 function dealAll(){
   for(const p of st.players)p.hole=p.hero?st.hole:[st.deck.pop(),st.deck.pop()];
 }
 
 /* ----- Полная раздача ----- */
+const R3=L=>3*BB+BB*L; // размер рейза по уроку 5: 3ББ + 1ББ за каждого уравнявшего
 function startFull(){
   const heroSeat=PRE_ORDER[tbl.hIdx], late=!!LATE[heroSeat], sizeT=topicPick==="size";
-  tbl.hIdx=(tbl.hIdx+4)%5;sv("pk-table",tbl);
+  tbl.hIdx=(tbl.hIdx+5)%6;
+  tbl.stacks=tbl.stacks.map(x=>x<REBUY_BELOW?START_STACK:x); // докупка у друзей
+  sv("pk-table6",tbl);
   let rebuy=false;
   if(heroStack<REBUY_BELOW){heroStack=START_STACK;rebuy=true;saveScore()}
   let deck,hole; const wantPlay=sizeT||Math.random()<.6;
@@ -801,55 +803,56 @@ function startFull(){
   st={mode:"full",deck,hole,board:[],street:"pre",phase:"act",players:seatPlayers(heroSeat),seen:[],carry:"",log:[],limpers:0,handId:newId(),preOnly:topicPick==="pre"||sizeT};
   if(rebuy)st.carry="Стек закончился: докупка до "+bbs(START_STACK)+" ББ.";
   dealAll();
-  P("SB").c=5;P("SB").last="блайнд 5";P("BB").c=10;P("BB").last="блайнд 10";
+  P("SB").c=BB;P("SB").last="блайнд "+BB;P("BB").c=BB;P("BB").last="блайнд "+BB;
   const idx=PRE_ORDER.indexOf(heroSeat);
   if(cfg.raise&&!sizeT&&idx>0&&Math.random()<.5){ // кто-то до тебя поднял
-    const earlier=PRE_ORDER.slice(0,idx),rz=P(pick(earlier)),to=pick([30,30,30,60]);
+    const earlier=PRE_ORDER.slice(0,idx),rz=P(pick(earlier)),to=pick([3*BB,3*BB,3*BB,6*BB]);
     for(const s of earlier){const p=P(s);
       if(p===rz){p.c=to;p.last="рейз "+to;st.seen.push(tag(p)+" рейз до "+to)}
       else{p.active=false;p.last="пас";st.seen.push(tag(p)+" пас")}}
     st.raise={seat:rz.seat,to};
   }else{
+    const limp=p=>{if(p.seat==="SB"||p.seat==="BB"){p.last="чек";st.seen.push(tag(p)+" чек")}else{p.c=BB;p.last="колл "+BB;st.seen.push(tag(p)+" колл "+BB);st.limpers++}};
     for(let i=0;i<idx;i++){const p=P(PRE_ORDER[i]);
-      if(Math.random()<.5){p.c=10;p.last=p.seat==="SB"?"доплатил":"колл 10";st.seen.push(tag(p)+" "+(p.seat==="SB"?"доплатил до 10":"колл 10"));st.limpers++}
+      if(p.seat==="SB"||Math.random()<.5)limp(p);
       else{p.active=false;p.last="пас";st.seen.push(tag(p)+" пас")}}
     if(heroSeat==="BB"&&!st.limpers){ // кто-то всегда заходит, иначе раздачи не будет
-      const p=P(PRE_ORDER[Math.floor(Math.random()*4)]);p.active=true;p.c=10;p.last=p.seat==="SB"?"доплатил":"колл 10";st.limpers=1;
-      st.seen=PRE_ORDER.slice(0,4).map(s=>tag(P(s))+" "+(P(s).active?(s==="SB"?"доплатил до 10":"колл 10"):"пас"));}
+      const p=P(PRE_ORDER[Math.floor(Math.random()*4)]);p.active=true;p.c=BB;p.last="колл "+BB;st.limpers=1;
+      st.seen=PRE_ORDER.slice(0,5).map(s=>{const q=P(s);return tag(q)+" "+(q.seat==="SB"?"чек":q.active?"колл "+BB:"пас")});}
   }
   render();
 }
 function preOptions(){
   const H=hero();
   if(st.raise){const to=st.raise.to;return [["raise","Рейз до "+to*3,0,to*3],["call","Колл "+(to-H.c)],["fold","Пас"]]}
-  const R=30+10*st.limpers,lo=Math.max(20,R-10),sz=[["raise","Рейз до "+lo,0,lo],["raise","Рейз до "+R,0,R]];
-  if(H.seat==="BB") return [...sz,["check","Чек"]];
-  return [...sz,["call",H.seat==="SB"?"Доплатить 5":"Колл 10"],["fold","Пас"]];
+  const R=R3(st.limpers),lo=Math.max(2*BB,R-BB),sz=[["raise","Рейз до "+lo,0,lo],["raise","Рейз до "+R,0,R]];
+  if(H.seat==="BB"||H.seat==="SB") return [...sz,["check","Чек"]];
+  return [...sz,["call","Колл "+BB],["fold","Пас"]];
 }
 function preAfter(act,size){
   if(st.raise) return preAfterRaise(act);
-  const H=hero(),idx=PRE_ORDER.indexOf(H.seat),R=size||30+10*st.limpers;
+  const H=hero(),idx=PRE_ORDER.indexOf(H.seat),R=size||R3(st.limpers);
   st.seen=[];
-  if(act==="fold"){H.active=false;H.last="пас";return endHand("Ты сбросил карты. Раздача окончена.",0,{"как_закончилась":"герой сбросил карты"})}
+  if(act==="fold"){H.active=false;H.last="пас";return endHand("Ты сбросил карты. Раздача окончена.",0,{"как_закончилась":"герой сбросил карты"},foldPayout())}
   if(act==="raise"){
     H.c=R;H.last="рейз "+R;let callers=0;
     const order=[...PRE_ORDER.slice(idx+1),...PRE_ORDER.slice(0,idx)].map(P).filter(p=>p.active&&!p.hero);
     for(const p of order){
       if(callers<3&&Math.random()<.55){p.c=R;p.last="колл "+R;callers++;st.seen.push(tag(p)+" колл "+R)}
       else{p.active=false;p.last="пас";st.seen.push(tag(p)+" пас")}}
-    if(!callers) return endHand("Все сбросили карты, банк "+pot()+" твой. Рейз с сильной рукой часто забирает фишки сразу.",pot(),ALLFOLD);
+    if(!callers) return endHand("Все сбросили карты, банк "+pot()+" твой. Рейз с сильной рукой часто забирает фишки сразу.",pot(),ALLFOLD,heroWins());
   }else{
-    H.c=10;H.last=H.seat==="BB"?"чек":"колл 10";
+    H.c=Math.max(H.c,BB);H.last=(H.seat==="BB"||H.seat==="SB")?"чек":"колл "+BB;
     for(const p of PRE_ORDER.slice(idx+1).map(P)){
-      if(p.seat==="BB"){p.last="чек";st.seen.push(tag(p)+" чек")}
-      else if(Math.random()<.5){p.c=10;p.last=p.seat==="SB"?"доплатил":"колл 10";st.seen.push(tag(p)+" "+(p.seat==="SB"?"доплатил до 10":"колл 10"))}
+      if(p.seat==="BB"||p.seat==="SB"){p.last="чек";st.seen.push(tag(p)+" чек")}
+      else if(Math.random()<.5){p.c=BB;p.last="колл "+BB;st.seen.push(tag(p)+" колл "+BB)}
       else{p.active=false;p.last="пас";st.seen.push(tag(p)+" пас")}}
   }
 }
 function preAfterRaise(act){
   const H=hero(),rz=P(st.raise.seat),to=st.raise.to,behind=PRE_ORDER.slice(PRE_ORDER.indexOf(H.seat)+1).map(P);
   st.seen=[];
-  if(act==="fold"){H.active=false;H.last="пас";return endHand("Ты сбросил карты. Раздача окончена.",0,{"как_закончилась":"герой сбросил карты"})}
+  if(act==="fold"){H.active=false;H.last="пас";return endHand("Ты сбросил карты. Раздача окончена.",0,{"как_закончилась":"герой сбросил карты"},foldPayout())}
   if(act==="call"){
     H.c=to;H.last="колл "+to;
     for(const p of behind){
@@ -859,7 +862,7 @@ function preAfterRaise(act){
     H.c=to*3;H.last="рейз "+to*3;
     for(const p of behind){p.active=false;p.last="пас";st.seen.push(tag(p)+" пас")}
     if(Math.random()<.6){rz.c=to*3;rz.last="колл "+to*3;st.seen.push(tag(rz)+" колл "+to*3)}
-    else{rz.active=false;rz.last="пас";return endHand("Поднявший сбросил карты, банк "+pot()+" твой.",pot(),ALLFOLD)}
+    else{rz.active=false;rz.last="пас";return endHand("Поднявший сбросил карты, банк "+pot()+" твой.",pot(),ALLFOLD,heroWins())}
   }
 }
 
@@ -873,11 +876,11 @@ function startSpot(o){
   st={mode:o.mode,deck,hole,board,street,phase:"act",players:seatPlayers(heroSeat),seen:[],carry:"",log:[],limpers:0,handId:newId(),noDecision:!!o.noDecision,noticeOnly:!!o.noticeOnly};
   dealAll();
   const others=shuffle(st.players.filter(p=>!p.hero)), inHand=others.slice(0,n);
-  const per=pick([10,20,30]), per2=street==="turn"?pick([0,10,20,40]):street==="river"?pick([20,40,80]):0;
+  const per=pick([5,10,15]), per2=street==="turn"?pick([0,5,10,20]):street==="river"?pick([10,20,40]):0;
   for(const p of st.players){
     if(p.hero||inHand.includes(p)){p.c=per+per2}
-    else{p.active=false;p.last="пас";p.c=p.seat==="SB"?5:p.seat==="BB"?10:0}
-    p.stack0=p.c+pick([100,200,300,500,800]);
+    else{p.active=false;p.last="пас";p.c=p.seat==="SB"||p.seat==="BB"?BB:0}
+    p.stack0=p.c+pick([60,100,150,200]);
   }
   startStreet();
 }
@@ -908,7 +911,7 @@ function startStreet(){
   advance();
 }
 function queueAfter(p){const i=POST_ORDER.indexOf(p.seat);st.toAct=[];
-  for(let k=1;k<5;k++){const s=POST_ORDER[(i+k)%5];if(P(s).active&&!P(s).allin)st.toAct.push(s)}}
+  for(let k=1;k<6;k++){const s=POST_ORDER[(i+k)%6];if(P(s).active&&!P(s).allin)st.toAct.push(s)}}
 function aiStrength(p){
   const h=classify(p.hole,st.board,unseenFor([...p.hole,...st.board]));
   return h.strong?3:h.medium?2:h.outs?1:0;
@@ -937,7 +940,7 @@ function advanceInner(){
     if(p.hero){prepareHero();render();return}
     st.toAct.shift();aiAct(p);
   }
-  if(!opps().length) return endHand("Все сбросили карты, банк "+pot()+" твой.",pot(),ALLFOLD);
+  if(!opps().length) return endHand("Все сбросили карты, банк "+pot()+" твой.",pot(),ALLFOLD,heroWins());
   st.prevStreet=st.street;
   if(st.street==="flop"){st.board.push(st.deck.pop());st.street="turn";startStreet()}
   else if(st.street==="turn"){st.board.push(st.deck.pop());st.street="river";startStreet()}
@@ -985,7 +988,7 @@ function postAfter(act,f,amt){
   if(act==="bet"){const a=put(H,amt);st.bet=H.s;st.betMade=true;st.byHero=true;st.betFrac=f;H.last="ставка "+a+(H.allin?" (олл-ин)":"");queueAfter(H)}
   if(act==="call"){put(H,facing);H.last="колл "+H.s+(H.allin?" (олл-ин)":"")}
   if(act==="raise"){put(H,amt-H.s);st.bet=H.s;st.byHero=true;H.last="рейз "+H.s+(H.allin?" (олл-ин)":"");queueAfter(H)}
-  if(act==="fold"){H.active=false;H.last="пас";endHand("Ты сбросил карты. Раздача окончена.",0,{"как_закончилась":"герой сбросил карты"})}
+  if(act==="fold"){H.active=false;H.last="пас";endHand("Ты сбросил карты. Раздача окончена.",0,{"как_закончилась":"герой сбросил карты"},foldPayout())}
 }
 /* Делим банк с учётом побочных банков (олл-ин на разные суммы) */
 function settle(live){
@@ -1024,7 +1027,7 @@ function showdown(){
   }
   const info={"как_закончилась":"вскрытие","карты_героя":st.hole.join(" "),"карты_соперников":{},"комбинации":{},"победили":winners.map(p=>p.name)};
   live.forEach(p=>{info["комбинации"][p.name]=handLabel(p.e);if(!p.hero)info["карты_соперников"][p.name+" ("+SEATS[p.seat]+")"]=p.hole.join(" ")});
-  endHand(t,hw,info);
+  endHand(t,hw,info,won);
 }
 const ALLFOLD={"как_закончилась":"все соперники сбросили, банк забрал герой"};
 function logFinish(id,info){
@@ -1032,12 +1035,24 @@ function logFinish(id,info){
   L.forEach(r=>{if(r["id_раздачи"]===id){r["итог_раздачи"]=info;ch=true}});
   if(ch)sv("pk-log",L);
 }
-function endHand(text,won,info){
+const heroWins=()=>({[hero().seat]:pot()});
+function foldPayout(){ // герой сбросил: добираем борд и делим банк между оставшимися соперниками
+  const live=opps();if(!live.length||!st.deck||!st.deck.length)return {};
+  if(live.length===1)return {[live[0].seat]:pot()};
+  const b=[...st.board];while(b.length<5)b.push(st.deck.pop());
+  live.forEach(p=>{p.e=evalBest([...p.hole,...b])});
+  return settle(live).won;
+}
+function endHand(text,won,info,payout){
   st.phase="end";
   info=Object.assign({},info||{"как_закончилась":"раздача завершена"});
   info["борд_финал"]=st.board.join(" ");
   if(won!==undefined){info["банк"]=pot();info["результат_героя_фишек"]=won-hero().c}
   st.result=info;if(st.handId)logFinish(st.handId,info);
+  if(payout&&st.mode==="full"&&!st.preOnly){ // стеки друзей тоже переходят из раздачи в раздачу
+    for(const p of st.players)if(!p.hero&&p.fi>=0)tbl.stacks[p.fi]=Math.max(0,tbl.stacks[p.fi]+(payout[p.seat]||0)-p.c);
+    sv("pk-table6",tbl);
+  }
   if(won!==undefined&&st.mode==="full"&&!st.preOnly){
     const net=won-hero().c;chips+=net;heroStack=Math.max(0,heroStack+net);saveScore();
     text+="<br>Фишки за раздачу: <b>"+(net>0?"+":"")+net+"</b> ("+(net>0?"+":"")+bbs(net)+" ББ).";
@@ -1203,7 +1218,7 @@ function render(){
   if(st.phase==="end"){situ.innerHTML=prev+"<div>"+st.endText+"</div>";showSummary();return}
   let line;
   if(st.street==="pre"){
-    line=(st.seen.length?st.seen.join(", ")+". ":"Ты ходишь первым. ")+(st.raise?"Твой ход: против рейза.":H.seat==="BB"?"Все уравняли или сбросили: можешь бесплатно посмотреть флоп.":"Твой ход: входишь в игру?");
+    line=(st.seen.length?st.seen.join(", ")+". ":"Ты ходишь первым. ")+(st.raise?"Твой ход: против рейза.":(H.seat==="BB"||H.seat==="SB")?"Все уравняли или сбросили: можешь бесплатно посмотреть флоп.":"Твой ход: входишь в игру?");
   }else{
     const facing=st.x?st.x.facing:0;
     line=(st.seen.length?st.seen.join(", ")+". ":"Ты ходишь первым. ")+(facing?"Тебе нужно доплатить <b>"+facing+"</b>, в банке <b>"+pot()+"</b>.":"Ставок не было, твой ход.")+" Твой стек: "+bbs(rem(H))+" ББ.";
@@ -1255,7 +1270,7 @@ function profileRec(facing){
 function ctxRec(){
   const H=hero(),pre=st.street==="pre";
   let facing=0,frac=0;
-  if(pre){facing=st.raise?st.raise.to-H.c:H.seat==="BB"?0:10-H.c;if(st.raise)frac=Math.round(st.raise.to/Math.max(1,pot()-st.raise.to)*100)/100}
+  if(pre){facing=st.raise?st.raise.to-H.c:H.seat==="BB"||H.seat==="SB"?0:BB-H.c;if(st.raise)frac=Math.round(st.raise.to/Math.max(1,pot()-st.raise.to)*100)/100}
   else{facing=st.x?st.x.facing:0;frac=facing>0?st.betFrac:0}
   const cls=pre?({p:"всегда",l:"поздняя",f:"пас"})[tier(st.hole)]:st.h.strong?"сильная":st.h.medium?"средняя":st.h.outs?"дро":"ничего";
   return {"улица":SN[st.street],"место":SEATN[H.seat],"игроков":st.players.filter(p=>p.active).length,"карты":st.hole.join(" "),"борд":st.board.join(" "),"банк":pot(),"доплата":facing,
@@ -1371,7 +1386,7 @@ function journalText(){
   const rows=only?L.filter(r=>r["оценка"]!=="верно"):L;
   const ver={};L.forEach(r=>{const k=r["версия_правил"]===undefined?"не указана":r["версия_правил"];ver[k]=(ver[k]||0)+1});
   const head=["Сводка журнала покерного тренажёра","Версия правил сейчас: "+RULES_VERSION+". Записи с разной версией_правил сравнивать нельзя (менялись диапазон рук и правила оценки). В журнале по версиям: "+Object.entries(ver).map(([k,v])=>k+" — "+v).join("; "),
-    "потеря_фишек = цена решения в фишках: EV лучшего действия минус EV выбранного по грубой модели тренажёра (класс руки, размер ставки, шансы банка), а не точный расчёт; у верных решений и вопросов 0; 10 фишек = 1 ББ.",
+    "потеря_фишек = цена решения в фишках: EV лучшего действия минус EV выбранного по грубой модели тренажёра (класс руки, размер ставки, шансы банка), а не точный расчёт; у верных решений и вопросов 0; "+BB+" фишек = 1 ББ.",
     "итог_раздачи дописывается ко всем записям раздачи после её окончания (вскрытие, победители, результат героя): им отличай плохое решение от неудачи. id_раздачи и номер_решения группируют записи одной раздачи. флаги_борда: мокрый = возможен флеш или стрит, либо две карты одной масти и близкие ранги. профиль_соперника — настоящий стиль соперников из симуляции, игроку он скрыт до конца раздачи.",
     "Всего записей в журнале: "+L.length+" (решения и ответы на вопросы)",
     "Доля верных по темам: "+(Object.keys(by).length?Object.entries(by).map(([k,v])=>k+" "+Math.round(v.c/v.n*100)+"% ("+v.c+" из "+v.n+")").join("; "):"данных пока нет"),
