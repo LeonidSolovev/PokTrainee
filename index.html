@@ -138,7 +138,8 @@ details ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;g
     <select id="topic" aria-label="Тема тренировки"></select>
     <label id="l-raise"><input type="checkbox" id="cfg-raise"> Рейзы соперников до флопа</label>
     <label id="l-fair"><input type="checkbox" id="cfg-fair"> Честная раздача: свои карты без подбора</label>
-    <label id="l-blitz"><input type="checkbox" id="cfg-blitz"> Блиц в раздаче: назови комбинацию на время (10 с)</label>
+    <label id="l-draws"><input type="checkbox" id="cfg-draws"> Замечай дро: случайный вопрос «есть ли у тебя дро?» (10 с)</label>
+    <label id="l-blitz"><input type="checkbox" id="cfg-blitz"> Блиц: назови свою комбинацию на время (10 с)</label>
     <select id="minisel" aria-label="Тип мини-тренажёра"><option value="all">Все мини-тренажёры</option><option value="combo">Комбинация на время</option><option value="rank">Какая рука старше</option><option value="need">Нужный шанс</option></select>
     <select id="showsel" aria-label="Тип вскрытия"><option value="all">Все случаи</option><option value="kicker">Кикер</option><option value="full">Фулл-хаус</option><option value="wheel">Колесо A-2-3-4-5</option><option value="board">Игра борда</option><option value="flush">Равные флеши</option><option value="random">Случайные руки</option></select>
   </div>
@@ -262,6 +263,7 @@ const TOPICS={
   odds:{name:"Шансы банка",pick:"Урок 3 · шансы банка"},
   outs:{name:"Ауты",pick:"Урок 4 · ауты и проценты"},
   river:{name:"Ривер",pick:"Урок 6 · ривер"},
+  draw:{name:"Замечать дро",pick:"Замечать дро (вопрос на время)"},
   show:{name:"Вскрытие",pick:null},
   combo:{name:"Комбинации",pick:null}
 };
@@ -455,6 +457,18 @@ function classify(hole,board,deck){
   const outs=outCards.length>=4?outCards.length:0;
   return {strong,medium,outs,outCards:outs?outCards:[],fo,so,sRanks:[...sRanks],dtype};
 }
+/* Какое дро у героя: 0 нет, 1 флеш-дро, 2 открытое стрит-дро, 3 гатшот, 4 два дро сразу (бэкдоры не считаем) */
+const DRAWN=["Нет дро","Флеш-дро","Открытое стрит-дро","Гатшот","Два дро сразу (флеш + стрит)"];
+function drawInfo(hole,board){
+  if(board.length>=5||made(hole,board))return {kind:0,made:board.length<5,fo:0,so:0,sRanks:[],cards:[]};
+  const all=[...hole,...board];let fo=0,so=0,cards=[];const sr=new Set();
+  for(const c of unseenFor(all)){
+    const f=flush([...all,c],hole),sg=straight([...all,c])&&!straight([...board,c]);
+    if(f){fo++}if(sg){so++;sr.add(c[0])}if(f||sg)cards.push(c);
+  }
+  const F=fo>=4,S=so>=4,open=so>=8;
+  return {kind:F&&S?4:F?1:S?(open?2:3):0,made:false,fo,so,sRanks:[...sr],cards:F||S?cards:[]};
+}
 function exactPct(outs,street,seen){ // seen — сколько карт видно (рука + борд)
   const left=52-seen;
   return Math.round(street==="flop"?(1-((left-outs)*(left-1-outs))/(left*(left-1)))*100:outs/left*100);
@@ -634,6 +648,21 @@ function outsExplain(h){
 }
 function makeQ(kind,h,x){
   const mult=x.street==="flop"?4:2;
+  if(kind==="draw"){
+    const d=drawInfo(st.hole,st.board),rk=d.sRanks.map(r=>r==="T"?"10":r).join(" и ");
+    const suit=[...SUITS].map(s=>[s,[...st.hole,...st.board].filter(c=>su(c)===s).length]).sort((a,b)=>b[1]-a[1])[0][0];
+    let why;
+    if(d.kind===0)why=d.made?"У тебя уже собрана рука (стрит или флеш), дро не нужно.":"Дро нет: нет четырёх карт одной масти и нет четырёх карт подряд (карты на два шага вперёд, «бэкдоры», не считаем).";
+    else{
+      const parts=[];
+      if(d.fo>=4)parts.push("Флеш-дро: четыре карты масти "+SYM[suit]+" (хоть одна из них в руке), нужна пятая, "+d.fo+" аутов.");
+      if(d.so>=8)parts.push("Открытое стрит-дро: четыре карты подряд, стрит достраивают карты "+rk+" (с двух сторон), "+d.so+" аутов.");
+      else if(d.so>=4)parts.push("Гатшот: в стрите не хватает одной карты в середине ("+rk+"), "+d.so+" аутов.");
+      if(d.kind===4)parts.push("Оба дро сразу: пересекающиеся карты считаем один раз.");
+      why=parts.join(" ")+"<br>"+d.cards.slice().sort((p,q)=>val(q)-val(p)).map(mini).join("");
+    }
+    return {kind,label:"дро",topic:"draw",timed:true,text:"Блиц: есть ли у тебя дро? Какое?",correct:d.kind,choices:[0,1,2,3,4],fmt:v=>DRAWN[v],explain:why};
+  }
   if(kind==="combo"){
     const e=evalBest([...st.hole,...st.board]);
     return {kind,label:"комбинация",topic:"combo",timed:true,
@@ -663,7 +692,7 @@ function makeQ(kind,h,x){
 }
 
 /* ===== Состояние, статистика, ошибки, журнал ===== */
-let heroStack=1000,miniPick="all",showPick="all",st,mode="full",score={C:0,O:0,W:0},chips=0,cfg={raise:true,fair:false,blitz:false},topicPick="all",stats={},mist=[];
+let heroStack=1000,miniPick="all",showPick="all",st,mode="full",score={C:0,O:0,W:0},chips=0,cfg={raise:true,fair:false,blitz:false,draws:true},topicPick="all",stats={},mist=[];
 const ld=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}};
 const sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 score=ld("pk-score",score);chips=ld("pk-chips",0);heroStack=ld("pk-stack",START_STACK);if(!(heroStack>0))heroStack=START_STACK;cfg=Object.assign(cfg,ld("pk-cfg2",{}));
@@ -674,6 +703,10 @@ mist=ld("pk-mist",[]);if(!Array.isArray(mist))mist=[];
 try{mode=localStorage.getItem("pk-mode")||"full"}catch(e){}
 if(!["full","drill","show","mini","mist"].includes(mode))mode="full";
 const stored=ld("pk-stats",{});
+/* Постоянный стол: те же четыре друга со своими стилями, баттон по кругу (у героя позиции идут BTN → CO → UTG → ББ → МБ → BTN) */
+let tbl=ld("pk-table",null);
+if(!tbl||!Array.isArray(tbl.names)||tbl.names.length!==4||!Array.isArray(tbl.styles)||!(tbl.hIdx>=0)){
+  tbl={names:shuffle(FRIENDS).slice(0,4),styles:[0,1,2,3].map(()=>pick(STYLE_POOL)),hIdx:Math.floor(Math.random()*5)};sv("pk-table",tbl)}
 for(const k in TOPICS)stats[k]=Object.assign({C:0,O:0,W:0},stored[k]);
 const GR={C:"верно",O:"допустимо",W:"ошибка"};
 
@@ -723,8 +756,9 @@ function put(p,x){x=Math.max(0,Math.min(x,rem(p)));p.s+=x;p.c+=x;if(rem(p)<=0)p.
 const bbs=x=>Math.round(x/BB*10)/10;
 
 function seatPlayers(heroSeat){
-  const names=shuffle(FRIENDS).slice(0,4);let k=0;
-  return PRE_ORDER.map(seat=>({seat,hero:seat===heroSeat,name:seat===heroSeat?"Ты":names[k++],active:true,c:0,s:0,last:"",allin:false,stack0:seat===heroSeat?heroStack:pick([300,500,800,1000]),style:seat===heroSeat?null:pick(STYLE_POOL)}));
+  const hi=PRE_ORDER.indexOf(heroSeat);
+  return PRE_ORDER.map((seat,j)=>{const i=(j-hi+5)%5;
+    return {seat,hero:i===0,name:i===0?"Ты":tbl.names[i-1],active:true,c:0,s:0,last:"",allin:false,stack0:i===0?heroStack:pick([300,500,800,1000]),style:i===0?null:tbl.styles[i-1]}});
 }
 function dealAll(){
   for(const p of st.players)p.hole=p.hero?st.hole:[st.deck.pop(),st.deck.pop()];
@@ -732,7 +766,8 @@ function dealAll(){
 
 /* ----- Полная раздача ----- */
 function startFull(){
-  const heroSeat=pick(PRE_ORDER), late=!!LATE[heroSeat], sizeT=topicPick==="size";
+  const heroSeat=PRE_ORDER[tbl.hIdx], late=!!LATE[heroSeat], sizeT=topicPick==="size";
+  tbl.hIdx=(tbl.hIdx+4)%5;sv("pk-table",tbl);
   let rebuy=false;
   if(heroStack<REBUY_BELOW){heroStack=START_STACK;rebuy=true;saveScore()}
   let deck,hole; const wantPlay=sizeT||Math.random()<.6;
@@ -808,9 +843,9 @@ function startSpot(o){
   let deck,hole,board,street,h;
   for(let i=0;i<800;i++){deck=deckNew();hole=[deck.pop(),deck.pop()];street=pick(o.streets);
     board=[];for(let k=0;k<{flop:3,turn:4,river:5}[street];k++)board.push(deck.pop());
-    h=classify(hole,board,unseenFor([...hole,...board])); if(o.ok(h))break}
+    h=classify(hole,board,unseenFor([...hole,...board])); if(o.ok(h,hole,board))break}
   const heroSeat=pick(PRE_ORDER), n=pick([1,2,2,3,3,4]);
-  st={mode:o.mode,deck,hole,board,street,phase:"act",players:seatPlayers(heroSeat),seen:[],carry:"",log:[],limpers:0,noDecision:!!o.noDecision};
+  st={mode:o.mode,deck,hole,board,street,phase:"act",players:seatPlayers(heroSeat),seen:[],carry:"",log:[],limpers:0,noDecision:!!o.noDecision,noticeOnly:!!o.noticeOnly};
   dealAll();
   const others=shuffle(st.players.filter(p=>!p.hero)), inHand=others.slice(0,n);
   const per=pick([10,20,30]), per2=street==="turn"?pick([0,10,20,40]):street==="river"?pick([20,40,80]):0;
@@ -828,6 +863,10 @@ function startHandSpot(){
   const want=pick(["strong","medium","none"]);
   startSpot({mode:"spot",streets:FLOPTURN,ok:h=>want==="strong"?!!h.strong:want==="medium"?(!h.strong&&!!h.medium):(!h.strong&&!h.medium&&!h.outs)});
 }
+function startNotice(){
+  const want=Math.random()<.5;
+  startSpot({mode:"spot",streets:["flop","flop","turn"],noticeOnly:true,noDecision:true,ok:(h,hole,board)=>{const d=drawInfo(hole,board);return want?d.kind>0:d.kind===0}});
+}
 function startRiverSpot(){startSpot({mode:"spot",streets:["river"],ok:()=>true})}
 
 /* ----- Игра на улице после флопа ----- */
@@ -840,6 +879,7 @@ function startStreet(){
   st.streetPot=pot();st.qBase=false;st.qNeedAt=-1;
   const able=POST_ORDER.filter(s=>P(s).active&&!P(s).allin);
   st.toAct=able.length>=2?able:[];
+  if(st.noticeOnly)st.toAct=[hero().seat];
   advance();
 }
 function queueAfter(p){const i=POST_ORDER.indexOf(p.seat);st.toAct=[];
@@ -883,11 +923,17 @@ function prepareHero(){
   st.phase="act";
   st.h=classify(st.hole,st.board,unseenFor([...st.hole,...st.board]));st.x=ctx();
   const steps=[];
-  if(cfg.blitz&&st.blitzStreet!==st.street&&st.mode!=="replay"){steps.push("combo");st.blitzStreet=st.street}
+  const notice=(st.mode==="full"||st.mode==="spot")&&st.street!=="river"&&(st.noticeOnly||(cfg.draws&&st.mode!=="replay"&&st.noticeStreet!==st.street&&Math.random()<.6));
+  if(notice){steps.push("draw");st.noticeStreet=st.street}
+  if(!st.noticeOnly&&cfg.blitz&&st.blitzStreet!==st.street&&st.mode!=="replay"){steps.push("combo");st.blitzStreet=st.street}
   if(st.h.outs){
     st.drawOuts=st.h.outs;st.drawStreet=st.street;st.drawSeen=2+st.board.length;
-    if(!st.qBase)steps.push("outs","eq");
-    if(st.x.facing>0&&st.qNeedAt!==st.bet)steps.push("need");
+    /* при включённом «замечай дро» вопросы про ауты идут только после вопроса про дро, иначе они выдают, что дро есть */
+    const hidden=cfg.draws&&!notice&&(st.mode==="full"||st.mode==="spot");
+    if(!st.noticeOnly&&!hidden){
+      if(!st.qBase)steps.push("outs","eq");
+      if(st.x.facing>0&&st.qNeedAt!==st.bet)steps.push("need");
+    }
   }
   if(steps.length){st.quiz={steps,i:0};st.phase="quiz"}
 }
@@ -1179,7 +1225,7 @@ function answerQuiz(v){
     if(q.kind==="need")st.qNeedAt=st.bet;
     st.quiz.i++;
     if(st.quiz.i>=st.quiz.steps.length){
-      if(st.noDecision){endHand("Вопросы по этой раздаче закончены. Решение в режиме «Ауты» не оцениваем.");return render()}
+      if(st.noDecision){endHand(st.noticeOnly?"Вопрос закончен. Новая ситуация — следующий борд.":"Вопросы по этой раздаче закончены. Решение в режиме «Ауты» не оцениваем.");return render()}
       st.phase="act";
     }
     render();
@@ -1243,13 +1289,13 @@ function newHand(){
   if(mode==="mini")return startMini();
   if(mode==="show")return startShow();
   if(mode==="mist")return startMist();
-  ({all:startFull,pre:startFull,size:startFull,hand:startHandSpot,odds:()=>startDrill(false),outs:()=>startDrill(true),river:startRiverSpot}[topicPick]||startFull)();
+  ({all:startFull,pre:startFull,size:startFull,hand:startHandSpot,draw:startNotice,odds:()=>startDrill(false),outs:()=>startDrill(true),river:startRiverSpot}[topicPick]||startFull)();
 }
 const MODES=["full","drill","show","mini","mist"];
 function setMode(m){mode=m;try{localStorage.setItem("pk-mode",m)}catch(e){}
   for(const k of MODES)document.getElementById("mode-"+k).setAttribute("aria-pressed",String(m===k));
   document.getElementById("bar").hidden=!["full","mini","show"].includes(m);
-  for(const id of ["topic","l-raise","l-fair","l-blitz"])document.getElementById(id).hidden=m!=="full";
+  for(const id of ["topic","l-raise","l-fair","l-draws","l-blitz"])document.getElementById(id).hidden=m!=="full";
   document.getElementById("minisel").hidden=m!=="mini";
   document.getElementById("showsel").hidden=m!=="show";
   newHand()}
@@ -1257,7 +1303,7 @@ for(const k of MODES)document.getElementById("mode-"+k).onclick=()=>setMode(k);
 topicSel.value=topicPick;
 topicSel.onchange=()=>{topicPick=topicSel.value;sv("pk-topic",topicPick);newHand()};
 const bindCfg=(id,key)=>{const el=document.getElementById(id);el.checked=!!cfg[key];el.onchange=()=>{cfg[key]=el.checked;sv("pk-cfg2",cfg);newHand()}};
-bindCfg("cfg-raise","raise");bindCfg("cfg-fair","fair");bindCfg("cfg-blitz","blitz");
+bindCfg("cfg-raise","raise");bindCfg("cfg-fair","fair");bindCfg("cfg-blitz","blitz");bindCfg("cfg-draws","draws");
 const ms=document.getElementById("minisel");ms.value=miniPick;
 ms.onchange=()=>{miniPick=ms.value;sv("pk-mini",miniPick);newHand()};
 const ss=document.getElementById("showsel");ss.value=showPick;
