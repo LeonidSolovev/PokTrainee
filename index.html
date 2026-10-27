@@ -1152,7 +1152,7 @@ function render(){
   document.getElementById("seats").innerHTML=st.players.map(p=>{
     const show=st.showdown&&p.active&&!p.hero;
     return '<div class="seat'+(p.hero?" hero":"")+(p.active?"":" out")+(st.showdown&&st.winners.includes(p.seat)?" win":"")+'">'+(p.seat==="BTN"?'<span class="dbtn" title="Баттон">D</span>':"")+
-    '<div class="sn">'+p.name+'</div><div class="sp">'+SEATS[p.seat]+'</div><div class="sk">'+Math.round(rem(p)/BB)+' ББ</div><div class="sa'+(show?" cards":"")+'">'+(show?p.hole.map(mini).join(""):(p.last||"&nbsp;"))+"</div></div>"}).join("");
+    '<div class="sn">'+p.name+'</div><div class="sp">'+SEATS[p.seat]+'</div><div class="sk">'+bbs(rem(p))+' ББ</div><div class="sa'+(show?" cards":"")+'">'+(show?p.hole.map(mini).join(""):(p.last||"&nbsp;"))+"</div></div>"}).join("");
   document.getElementById("m-pos").innerHTML="Твоё место: <b>"+SEATN[H.seat]+"</b>";
   document.getElementById("m-pot").textContent=pot()+" ("+bbs(pot())+" ББ)";
   document.getElementById("m-street").textContent=st.phase==="end"?"Конец раздачи":{pre:"Префлоп",flop:"Флоп",turn:"Тёрн",river:"Ривер"}[st.street];
@@ -1169,7 +1169,7 @@ function render(){
     line=(st.seen.length?st.seen.join(", ")+". ":"Ты ходишь первым. ")+(st.raise?"Твой ход: против рейза.":H.seat==="BB"?"Все уравняли или сбросили: можешь бесплатно посмотреть флоп.":"Твой ход: входишь в игру?");
   }else{
     const facing=st.x?st.x.facing:0;
-    line=(st.seen.length?st.seen.join(", ")+". ":"Ты ходишь первым. ")+(facing?"Тебе нужно доплатить <b>"+facing+"</b>, в банке <b>"+pot()+"</b>.":"Ставок не было, твой ход.")+" Твой стек: "+Math.round(rem(H)/BB)+" ББ.";
+    line=(st.seen.length?st.seen.join(", ")+". ":"Ты ходишь первым. ")+(facing?"Тебе нужно доплатить <b>"+facing+"</b>, в банке <b>"+pot()+"</b>.":"Ставок не было, твой ход.")+" Твой стек: "+bbs(rem(H))+" ББ.";
   }
   situ.innerHTML=prev+"<div>"+line+"</div>";
   if(st.phase==="quiz"){
@@ -1266,7 +1266,7 @@ function answer(act,f,amt){
   const o={topic,rec,best,loss,entry:{type:"dec",topic,snap:snapshot()}};
   if(st.replay)return feedback(res,"",()=>finishReplay(res),"Дальше",{noScore:true,rec,topic,best,loss});
   if(street==="pre")preAfter(act,amount);else postAfter(act,size,amount);
-  if(street==="pre"&&st.preOnly&&st.phase!=="end")endHand("Тема «"+TOPICS[topicPick==="size"?"size":"pre"].name+"»: решение оценено, флоп в этом режиме не играем.");
+  if(street==="pre"&&st.preOnly&&st.phase!=="end")endHand("Тема «"+TOPICS[topicPick==="size"?"size":"pre"].name+"»: решение оценено, флоп в этом режиме не играем. Стек в этом режиме не меняется.");
   feedback(res,SN[street]+" · решение",()=>{
     if(st.phase==="end")return render();
     if(st.street==="pre"){st.prevStreet="pre";for(let k=0;k<3;k++)st.board.push(st.deck.pop());st.street="flop";startStreet()}
