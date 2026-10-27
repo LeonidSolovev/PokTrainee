@@ -123,7 +123,7 @@ details ul{margin:8px 0 0;padding-left:18px;display:flex;flex-direction:column;g
 <div class="wrap">
   <header>
     <h1>Покерный тренажёр</h1>
-    <div class="score" aria-label="Счёт"><span class="g" id="sc-g">✓ 0</span><span class="o" id="sc-o">~ 0</span><span class="b" id="sc-b">✗ 0</span><span id="sc-chips" title="Фишки за раздачи полного режима">фишки 0</span></div>
+    <div class="score" aria-label="Счёт"><span class="g" id="sc-g">✓ 0</span><span class="o" id="sc-o">~ 0</span><span class="b" id="sc-b">✗ 0</span><span id="sc-stack" title="Твой стек переходит из раздачи в раздачу">стек 100 ББ</span><span id="sc-chips" title="Фишки за раздачи полного режима">фишки 0</span></div>
   </header>
 
   <div class="seg" role="group" aria-label="Режим">
@@ -269,7 +269,7 @@ const topicSel=document.getElementById("topic");
 topicSel.innerHTML='<option value="all">Все темы (полная раздача)</option>'+Object.keys(TOPICS).filter(k=>TOPICS[k].pick).map(k=>'<option value="'+k+'">'+TOPICS[k].pick+"</option>").join("");
 
 /* ===== Карты ===== */
-const BB=10,BLITZ_SEC=10;
+const BB=10,BLITZ_SEC=10,START_STACK=1000,REBUY_BELOW=30;
 const RANKS="23456789TJQKA",SUITS="shdc",SYM={s:"♠",h:"♥",d:"♦",c:"♣"};
 const val=c=>RANKS.indexOf(c[0])+2, su=c=>c[1];
 const PL={14:"тузы",13:"короли",12:"дамы",11:"валеты",10:"десятки",9:"девятки",8:"восьмёрки",7:"семёрки",6:"шестёрки",5:"пятёрки",4:"четвёрки",3:"тройки",2:"двойки"};
@@ -663,10 +663,10 @@ function makeQ(kind,h,x){
 }
 
 /* ===== Состояние, статистика, ошибки, журнал ===== */
-let miniPick="all",showPick="all",st,mode="full",score={C:0,O:0,W:0},chips=0,cfg={raise:true,fair:false,blitz:false},topicPick="all",stats={},mist=[];
+let heroStack=1000,miniPick="all",showPick="all",st,mode="full",score={C:0,O:0,W:0},chips=0,cfg={raise:true,fair:false,blitz:false},topicPick="all",stats={},mist=[];
 const ld=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}};
 const sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
-score=ld("pk-score",score);chips=ld("pk-chips",0);cfg=Object.assign(cfg,ld("pk-cfg2",{}));
+score=ld("pk-score",score);chips=ld("pk-chips",0);heroStack=ld("pk-stack",START_STACK);if(!(heroStack>0))heroStack=START_STACK;cfg=Object.assign(cfg,ld("pk-cfg2",{}));
 topicPick=ld("pk-topic","all");if(topicPick!=="all"&&!(TOPICS[topicPick]&&TOPICS[topicPick].pick))topicPick="all";
 miniPick=ld("pk-mini","all");if(!["all","combo","rank","need"].includes(miniPick))miniPick="all";
 showPick=ld("pk-show","all");if(!["all","kicker","full","wheel","board","flush","random"].includes(showPick))showPick="all";
@@ -687,7 +687,8 @@ function renderStats(){
   document.getElementById("weak").textContent=worst?"Слабее всего сейчас: «"+TOPICS[worst.k].name+"» ("+Math.round(worst.pc*100)+"%)."+(TOPICS[worst.k].pick?" Выбери её в списке тем и потренируйся отдельно.":""):"Нужно хотя бы 5 ответов по теме, чтобы показать слабое место. Процент: верно = 1, допустимо = ½.";
 }
 function updateMistBtn(){document.getElementById("mode-mist").textContent="Мои ошибки"+(mist.length?" ("+mist.length+")":"")}
-function saveScore(){sv("pk-score",score);sv("pk-chips",chips);sv("pk-stats",stats);sv("pk-mist",mist);
+function saveScore(){sv("pk-score",score);sv("pk-chips",chips);sv("pk-stack",heroStack);
+  document.getElementById("sc-stack").textContent="стек "+bbs(heroStack)+" ББ";sv("pk-stats",stats);sv("pk-mist",mist);
   document.getElementById("sc-g").textContent="✓ "+score.C;
   document.getElementById("sc-o").textContent="~ "+score.O;
   document.getElementById("sc-b").textContent="✗ "+score.W;
@@ -723,7 +724,7 @@ const bbs=x=>Math.round(x/BB*10)/10;
 
 function seatPlayers(heroSeat){
   const names=shuffle(FRIENDS).slice(0,4);let k=0;
-  return PRE_ORDER.map(seat=>({seat,hero:seat===heroSeat,name:seat===heroSeat?"Ты":names[k++],active:true,c:0,s:0,last:"",allin:false,stack0:pick([300,500,800,1000]),style:seat===heroSeat?null:pick(STYLE_POOL)}));
+  return PRE_ORDER.map(seat=>({seat,hero:seat===heroSeat,name:seat===heroSeat?"Ты":names[k++],active:true,c:0,s:0,last:"",allin:false,stack0:seat===heroSeat?heroStack:pick([300,500,800,1000]),style:seat===heroSeat?null:pick(STYLE_POOL)}));
 }
 function dealAll(){
   for(const p of st.players)p.hole=p.hero?st.hole:[st.deck.pop(),st.deck.pop()];
@@ -732,10 +733,13 @@ function dealAll(){
 /* ----- Полная раздача ----- */
 function startFull(){
   const heroSeat=pick(PRE_ORDER), late=!!LATE[heroSeat], sizeT=topicPick==="size";
+  let rebuy=false;
+  if(heroStack<REBUY_BELOW){heroStack=START_STACK;rebuy=true;saveScore()}
   let deck,hole; const wantPlay=sizeT||Math.random()<.6;
   for(let i=0;i<300;i++){deck=deckNew();hole=[deck.pop(),deck.pop()];
     const t=tier(hole); if((!sizeT&&(cfg.fair||!wantPlay))||t==="p"||(t==="l"&&late))break}
   st={mode:"full",deck,hole,board:[],street:"pre",phase:"act",players:seatPlayers(heroSeat),seen:[],carry:"",log:[],limpers:0,preOnly:topicPick==="pre"||sizeT};
+  if(rebuy)st.carry="Стек закончился: докупка до "+bbs(START_STACK)+" ББ.";
   dealAll();
   P("SB").c=5;P("SB").last="блайнд 5";P("BB").c=10;P("BB").last="блайнд 10";
   const idx=PRE_ORDER.indexOf(heroSeat);
@@ -952,7 +956,7 @@ function showdown(){
 function endHand(text,won){
   st.phase="end";
   if(won!==undefined&&st.mode==="full"&&!st.preOnly){
-    const net=won-hero().c;chips+=net;saveScore();
+    const net=won-hero().c;chips+=net;heroStack=Math.max(0,heroStack+net);saveScore();
     text+="<br>Фишки за раздачу: <b>"+(net>0?"+":"")+net+"</b> ("+(net>0?"+":"")+bbs(net)+" ББ).";
   }
   st.endText=text;
@@ -1301,7 +1305,7 @@ let resetArmed=0;
 document.getElementById("reset").onclick=e=>{
   if(!resetArmed){resetArmed=setTimeout(()=>{resetArmed=0;e.target.textContent="Сбросить счёт, статистику и ошибки"},4000);e.target.textContent="Точно сбросить? Нажми ещё раз";return}
   clearTimeout(resetArmed);resetArmed=0;e.target.textContent="Сбросить счёт, статистику и ошибки";
-  score={C:0,O:0,W:0};chips=0;mist=[];for(const k in stats)stats[k]={C:0,O:0,W:0};saveScore();if(mode==="mist")startMist()};
+  score={C:0,O:0,W:0};chips=0;heroStack=START_STACK;mist=[];for(const k in stats)stats[k]={C:0,O:0,W:0};saveScore();if(mode==="mist")startMist()};
 document.addEventListener("keydown",e=>{
   if(e.ctrlKey||e.metaKey||e.altKey||/^(SELECT|INPUT|TEXTAREA)$/.test(e.target.tagName))return;
   if(/^[1-9]$/.test(e.key)){const b=document.querySelectorAll("#acts button")[+e.key-1];if(b)b.click()}
